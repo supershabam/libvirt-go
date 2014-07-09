@@ -41,6 +41,14 @@ type VirDomainInterfaceStats struct {
 	TxDropped int64
 }
 
+type VirDomainBlockStats struct {
+	RdReq   int64
+	RdBytes int64
+	WrReq   int64
+	WrBytes int64
+	Errors  int64
+}
+
 func (dest *VirTypedParameters) loadFromCPtr(params C.virTypedParameterPtr, nParams int) {
 	// reset slice
 	*dest = VirTypedParameters{}
@@ -489,4 +497,27 @@ func (d *VirDomain) InterfaceStats(path string) (VirDomainInterfaceStats, error)
 	vdis.TxDropped = int64(stats.tx_drop)
 
 	return vdis, nil
+}
+
+func (d *VirDomain) BlockStats(disk string) (VirDomainBlockStats, error) {
+	vdbs := VirDomainBlockStats{}
+
+	cDisk := C.CString(disk)
+	defer C.free(unsafe.Pointer(cDisk))
+
+	stats := C.virDomainBlockStatsStruct{}
+	size := C.size_t(unsafe.Sizeof(stats))
+	ptr := (C.virDomainBlockStatsPtr)(unsafe.Pointer(&stats))
+	result := C.virDomainBlockStats(d.ptr, cDisk, ptr, size)
+	if result == -1 {
+		return vdbs, errors.New(GetLastError())
+	}
+
+	vdbs.RdReq = int64(stats.rd_req)
+	vdbs.RdBytes = int64(stats.rd_bytes)
+	vdbs.WrReq = int64(stats.wr_req)
+	vdbs.WrBytes = int64(stats.wr_bytes)
+	vdbs.Errors = int64(stats.errs)
+
+	return vdbs, nil
 }
