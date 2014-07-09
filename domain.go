@@ -30,6 +30,17 @@ type VirTypedParameter struct {
 
 type VirTypedParameters []VirTypedParameter
 
+type VirDomainInterfaceStats struct {
+	RxBytes   int64
+	RxPackets int64
+	RxErrors  int64
+	RxDropped int64
+	TxBytes   int64
+	TxPackets int64
+	TxErrors  int64
+	TxDropped int64
+}
+
 func (dest *VirTypedParameters) loadFromCPtr(params C.virTypedParameterPtr, nParams int) {
 	// reset slice
 	*dest = VirTypedParameters{}
@@ -452,4 +463,30 @@ func (d *VirDomain) DetachDeviceFlags(xml string, flags uint) error {
 		return errors.New(GetLastError())
 	}
 	return nil
+}
+
+func (d *VirDomain) InterfaceStats(path string) (VirDomainInterfaceStats, error) {
+	vdis := VirDomainInterfaceStats{}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	stats := C.virDomainInterfaceStatsStruct{}
+	size := C.size_t(unsafe.Sizeof(stats))
+	ptr := (C.virDomainInterfaceStatsPtr)(unsafe.Pointer(&stats))
+	result := C.virDomainInterfaceStats(d.ptr, cPath, ptr, size)
+	if result == -1 {
+		return vdis, errors.New(GetLastError())
+	}
+
+	vdis.RxBytes = int64(stats.rx_bytes)
+	vdis.RxPackets = int64(stats.rx_packets)
+	vdis.RxErrors = int64(stats.rx_errs)
+	vdis.RxDropped = int64(stats.rx_drop)
+	vdis.TxBytes = int64(stats.tx_bytes)
+	vdis.TxPackets = int64(stats.tx_packets)
+	vdis.TxErrors = int64(stats.tx_errs)
+	vdis.TxDropped = int64(stats.tx_drop)
+
+	return vdis, nil
 }
